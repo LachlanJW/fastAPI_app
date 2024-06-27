@@ -68,7 +68,7 @@ def test_get_item():
 
 def test_get_invalid_item_id():
     """
-    Test that attempting to retrieve an item with an invalid ID returns a 404 error.
+    Test that attempting to retrieve item with an invalid ID returns 404 error.
     """
     response = client.get("/data/9999999999")
     assert response.status_code == 404
