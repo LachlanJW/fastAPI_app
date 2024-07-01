@@ -104,32 +104,22 @@ def create_access_token(data: dict,
 #                               API Functions
 # =============================================================================
 
-
-@app.post("/token", response_model=Dict[str, str])
-async def login(form_data: OAuth2PasswordRequestForm = Depends()) -> Dict[str, str]:
+def load_data() -> List[Dict[str, Any]]:
     """
-    Endpoint to authenticate a user and return a JWT token.
-
-    Args:
-        form_data (OAuth2PasswordRequestForm): Containing username, password.
-
     Returns:
-        Dict[str, str]: Access token and token type.
+        List[Dict[str, Any]]: List of items loaded from the JSON.
     """
-    user = authenticate_user(fake_users_db,
-                             form_data.username,
-                             form_data.password)
-    if not user:
-        raise HTTPException(
-            status_code=400,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    access_token_expires = timedelta(minutes=TOKEN_EXP)
-    access_token = create_access_token(
-        data={"sub": user["username"]}, expires_delta=access_token_expires
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
+    with open(DATA_FILE, 'r') as file:
+        return json.load(file)
+
+
+def save_data(data: List[Dict[str, Any]]) -> None:
+    """
+    Args:
+        data (List[Dict[str, Any]]): List of items to be saved to the JSON.
+    """
+    with open(DATA_FILE, 'w') as file:
+        json.dump(data, file, indent=4)
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> Dict[str, Any]:
@@ -161,6 +151,33 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> Dict[str, Any
     if user is None:
         raise credentials_exception
     return user
+
+
+@app.post("/token", response_model=Dict[str, str])
+async def login(form_data: OAuth2PasswordRequestForm = Depends()) -> Dict[str, str]:
+    """
+    Endpoint to authenticate a user and return a JWT token.
+
+    Args:
+        form_data (OAuth2PasswordRequestForm): Containing username, password.
+
+    Returns:
+        Dict[str, str]: Access token and token type.
+    """
+    user = authenticate_user(fake_users_db,
+                             form_data.username,
+                             form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=400,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=TOKEN_EXP)
+    access_token = create_access_token(
+        data={"sub": user["username"]}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 @app.get("/data", response_model=List[Dict[str, Any]])
@@ -220,21 +237,3 @@ async def delete_item(item_id: int,
             save_data(data)
             return {"message": "Item deleted", "item": deleted_item}
     raise HTTPException(status_code=404, detail="Item not found")
-
-
-def load_data() -> List[Dict[str, Any]]:
-    """
-    Returns:
-        List[Dict[str, Any]]: List of items loaded from the JSON.
-    """
-    with open(DATA_FILE, 'r') as file:
-        return json.load(file)
-
-
-def save_data(data: List[Dict[str, Any]]) -> None:
-    """
-    Args:
-        data (List[Dict[str, Any]]): List of items to be saved to the JSON.
-    """
-    with open(DATA_FILE, 'w') as file:
-        json.dump(data, file, indent=4)
