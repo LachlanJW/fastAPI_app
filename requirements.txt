@@ -2,3 +2,8 @@ fastapi
 pyjwt
 passlib
 types-passlib
+uvicorn
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+python-dotenv

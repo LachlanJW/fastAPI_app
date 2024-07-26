@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+
 # Constants for JWT encoding and decoding
 SECRET_KEY = os.getenv("SECRET_KEY")  # MUST BE IN CORRECT FORM
 ALGORITHM = "HS256"
@@ -22,8 +23,9 @@ TOKEN_EXP = 30  # Expiration time in minutes
 
 app = FastAPI()
 
-# Path to the JSON data file
+# Path to the JSON data files
 DATA_FILE = 'data.json'
+USERS_FILE = 'users.json'
 
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -43,6 +45,14 @@ fake_users_db = {
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
+def initialize_users_file():
+    if not os.path.exists(USERS_FILE):
+        with open(USERS_FILE, 'w') as file:
+            json.dump({}, file)
+
+
+initialize_users_file()
+
 # =============================================================================
 #                          Authentication Functions
 # =============================================================================
@@ -54,31 +64,6 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     True if password matches, otherwise False.
     """
     return pwd_context.verify(plain_password, hashed_password)
-
-
-def get_user(db: Dict[str, Any], username: str) -> Optional[Dict[str, Any]]:
-    """
-    Retrieve user from fake database.
-    Returns user data if found, None otherwise.
-    """
-    return db.get(username)
-
-
-def authenticate_user(fake_db: Dict[str, Any],
-                      username: str, pswd: str) -> Optional[Dict[str, Any]]:
-    """
-    Args:
-        fake_db (Dict[str, Any]): Database of users.
-        username (str): Username of the user to authenticate.
-        password (str): Plain text password of the user.
-
-    Returns:
-        Optional[Dict[str, Any]]: Authenticated user data or None.
-    """
-    user = get_user(fake_db, username)
-    if not user or not verify_password(pswd, user["hashed_password"]):
-        return None
-    return user
 
 
 def create_access_token(data: dict,
@@ -100,9 +85,81 @@ def create_access_token(data: dict,
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
+def load_users() -> Dict[str, Any]:
+    try:
+        with open(USERS_FILE, 'r') as file:
+            content = file.read().strip()
+            if content:
+                return json.loads(content)
+            else:
+                return {}
+    except FileNotFoundError:
+        return {}
+
+
+def save_users(users: Dict[str, Any]) -> None:
+    with open(USERS_FILE, 'w') as file:
+        json.dump(users, file, indent=4)
+
+
+def get_user(username: str) -> Optional[Dict[str, Any]]:
+    users = load_users()
+    return users.get(username)
+
+
+def create_user(user_data: Dict[str, Any]) -> None:
+    users = load_users()
+    users[user_data['username']] = user_data
+    save_users(users)
+
+
+# Update the authenticate_user function
+def authenticate_user(username: str, password: str) -> Optional[Dict[str, Any]]:
+    user = get_user(username)
+    if not user or not verify_password(password, user["hashed_password"]):
+        return None
+    return user
+
+
+# Add a new endpoint to create a user
+@app.post("/create_user", response_model=Dict[str, str])
+async def create_new_user(username: str, password: str, full_name: str, email: str):
+    if get_user(username):
+        raise HTTPException(status_code=400, detail="Username already exists")
+
+    hashed_password = pwd_context.hash(password)
+    user_data = {
+        "username": username,
+        "full_name": full_name,
+        "email": email,
+        "hashed_password": hashed_password,
+        "disabled": False
+    }
+    create_user(user_data)
+    return {"message": "User created successfully"}
+
+
+# Update the login endpoint
+@app.post("/token", response_model=Dict[str, str])
+async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = authenticate_user(form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=400,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=TOKEN_EXP)
+    access_token = create_access_token(
+        data={"sub": user["username"]}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
 # =============================================================================
 #                               API Functions
 # =============================================================================
+
 
 def load_data() -> List[Dict[str, Any]]:
     """
@@ -147,37 +204,10 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> Dict[str, Any
             raise credentials_exception
     except jwt.PyJWTError:
         raise credentials_exception
-    user = get_user(fake_users_db, username)
+    user = get_user(username)
     if user is None:
         raise credentials_exception
     return user
-
-
-@app.post("/token", response_model=Dict[str, str])
-async def login(form_data: OAuth2PasswordRequestForm = Depends()) -> Dict[str, str]:
-    """
-    Endpoint to authenticate a user and return a JWT token.
-
-    Args:
-        form_data (OAuth2PasswordRequestForm): Containing username, password.
-
-    Returns:
-        Dict[str, str]: Access token and token type.
-    """
-    user = authenticate_user(fake_users_db,
-                             form_data.username,
-                             form_data.password)
-    if not user:
-        raise HTTPException(
-            status_code=400,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    access_token_expires = timedelta(minutes=TOKEN_EXP)
-    access_token = create_access_token(
-        data={"sub": user["username"]}, expires_delta=access_token_expires
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
 
 
 @app.get("/data", response_model=List[Dict[str, Any]])
