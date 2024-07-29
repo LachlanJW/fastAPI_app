@@ -9,7 +9,7 @@ client = TestClient(app)
 DATA_FILE_BACKUP = 'data_backup.json'
 
 
-@pytest.fixture(scope="module", autouse=True)
+@pytest.fixture(scope="module")
 def backup_data_file():
     """
     Fixture to create a backup of the data file before any tests are run
@@ -20,7 +20,7 @@ def backup_data_file():
     shutil.copyfile(DATA_FILE_BACKUP, DATA_FILE)
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def reset_items():
     """
     Fixture to restore the original data before each test.
@@ -28,7 +28,7 @@ def reset_items():
     shutil.copyfile(DATA_FILE_BACKUP, DATA_FILE)
 
 
-def test_get_data():
+def test_get_data(backup_data_file, reset_items):
     """
     Test that the /data endpoint returns the data.
     """
@@ -48,7 +48,7 @@ def test_get_data():
         assert "date" in item
 
 
-def test_get_item():
+def test_get_item(backup_data_file, reset_items):
     """
     Test that the /data/{item_id} endpoint returns the correct item.
     """
@@ -66,7 +66,7 @@ def test_get_item():
     assert item["features"]["propertyType"] == "House"
 
 
-def test_get_invalid_item_id():
+def test_get_invalid_item_id(backup_data_file, reset_items):
     """
     Test that attempting to retrieve item with an invalid ID returns 404 error.
     """
@@ -75,7 +75,7 @@ def test_get_invalid_item_id():
     assert response.json()["detail"] == "Item not found"
 
 
-def test_delete_item():
+def test_delete_item(backup_data_file, reset_items):
     """
     Test that the DELETE request removes the item correctly.
     """
@@ -99,7 +99,7 @@ def test_delete_item():
     assert response.json()["detail"] == "Item not found"
 
 
-def test_delete_non_existent_item():
+def test_delete_non_existent_item(backup_data_file, reset_items):
     """
     Test that attempting to delete a non-existent item returns a 404 error.
     """
