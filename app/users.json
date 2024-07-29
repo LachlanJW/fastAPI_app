@@ -1,9 +1,9 @@
 {
-    "user1": {
-        "username": "user1",
-        "full_name": "user1",
-        "email": "user1@test.com",
-        "hashed_password": "$2b$12$ATssquPX4LrDklMBEpwNn.Ger59r4LMSizLnxnIWM2aKOufLi836u",
+    "testuser": {
+        "username": "testuser",
+        "full_name": "Test User",
+        "email": "testuser@example.com",
+        "hashed_password": "$2b$12$QguGRnWDYmunz1Okk6xWDO7zHTs3D6NOj2wa4MdB4Jk7bW6uJDgji",
         "disabled": false
     }
 }

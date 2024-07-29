@@ -17,7 +17,9 @@ load_dotenv()
 
 
 # Constants for JWT encoding and decoding
-SECRET_KEY = os.getenv("SECRET_KEY")  # MUST BE IN CORRECT FORM
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise ValueError("No SECRET_KEY set for JWT")
 ALGORITHM = "HS256"
 TOKEN_EXP = 30  # Expiration time in minutes
 
